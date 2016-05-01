@@ -12,6 +12,7 @@ import (
 
 var log = logrus.New()
 
+var channel = flag.String("channel", "general", "slack channel to post notifications")
 var bin = flag.String("bin", "", "binary for the runner to execute")
 var scriptPath = flag.String("scriptPath", "~/", "location of the script to be executed")
 var scriptArgs = flag.String("scriptArgs", "", "arguments for the script")
@@ -33,7 +34,7 @@ func main() {
 	signal.Notify(osSig, syscall.SIGINT, syscall.SIGTERM)
 
 	go func() {
-		slackNotif("Start of " + *bin + " program runner")
+		slackNotif("Start of " + *bin + " program runner", *channel)
 		log.Info("About to execute program runner command...")
 
 		cmd := exec.Command(*bin, *scriptPath, *scriptArgs)
@@ -47,10 +48,10 @@ func main() {
 
 		if runErr != nil {
 			log.Info("Failed to finish program execution ", runErr)
-			slackNotif("Failed to run program, log on to system to review the problem")
+			slackNotif("Failed to run program, log on to system to review the problem", *channel)
 		} else {
 			log.Info("Successfully executed program")
-			slackNotif("Successfully ran program")
+			slackNotif("Successfully ran program", *channel)
 		}
 
 		done <- true
@@ -60,7 +61,7 @@ func main() {
 	go func() {
 		for sig := range osSig {
 			log.Info(sig)
-			slackNotif(sig.String())
+			slackNotif(sig.String(), *channel)
 		}
 
 		done <- true
@@ -69,14 +70,14 @@ func main() {
 	<- done
 }
 
-func slackNotif(msg string) {
+func slackNotif(msg string, channel string) {
 
 	// Does an hard fail if the SLACK_API_KEY environment variables doesn't exist
 	api := slack.New(os.Getenv("SLACK_API_KEY"))
 
 	params := slack.PostMessageParameters{}
 
-	_, _, err := api.PostMessage("general", msg, params)
+	_, _, err := api.PostMessage(channel, msg, params)
 
 	if err != nil {
 		log.Error("Failed to post message to channel")
