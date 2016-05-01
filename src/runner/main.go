@@ -62,6 +62,8 @@ func main() {
 			log.Info(sig)
 			slackNotif(sig.String())
 		}
+
+		done <- true
 	}()
 
 	<- done
