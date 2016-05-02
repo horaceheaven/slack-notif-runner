@@ -1,11 +1,11 @@
 package main
 
 import (
-	"os/exec"
+	"flag"
 	"github.com/Sirupsen/logrus"
 	"github.com/nlopes/slack"
 	"os"
-	"flag"
+	"os/exec"
 	"os/signal"
 	"syscall"
 )
@@ -16,7 +16,6 @@ var channel = flag.String("channel", "general", "slack channel to post notificat
 var bin = flag.String("bin", "", "binary for the runner to execute")
 var scriptPath = flag.String("scriptPath", "~/", "location of the script to be executed")
 var scriptArgs = flag.String("scriptArgs", "", "arguments for the script")
-
 
 // TODO: Add setup and tear down steps
 
@@ -33,8 +32,10 @@ func main() {
 
 	signal.Notify(osSig, syscall.SIGINT, syscall.SIGTERM)
 
+	slackClient := getSlackClient()
+
 	go func() {
-		slackNotif("Start of " + *bin + " program runner", *channel)
+		sendSlackMessage(slackClient, "Start of "+*bin+" program runner", *channel)
 		log.Info("About to execute program runner command...")
 
 		cmd := exec.Command(*bin, *scriptPath, *scriptArgs)
@@ -48,42 +49,49 @@ func main() {
 
 		if runErr != nil {
 			log.Info("Failed to finish program execution ", runErr)
-			slackNotif("Failed to run program, log on to system to review the problem", *channel)
+			sendSlackMessage(slackClient, "Failed to run program, log on to system to review the problem", *channel)
 		} else {
 			log.Info("Successfully executed program")
-			slackNotif("Successfully ran program", *channel)
+			sendSlackMessage(slackClient, "Successfully ran program", *channel)
 		}
 
 		done <- true
 	}()
-
 
 	go func() {
 		for sig := range osSig {
 			log.Info(sig)
-			slackNotif(sig.String(), *channel)
+			sendSlackMessage(slackClient, "Runner stopped by the following signal: "+sig.String(), *channel)
 		}
 
 		done <- true
 	}()
 
-	<- done
+	<-done
 }
 
-func slackNotif(msg string, channel string) {
+func getSlackClient() *slack.Client {
+	apiKey, exist := os.LookupEnv("SLACK_API_KEY")
 
-	// Does an hard fail if the SLACK_API_KEY environment variables doesn't exist
-	api := slack.New(os.Getenv("SLACK_API_KEY"))
+	if !exist {
+		log.Error("Please set the SLACK_API_KEY")
+	}
+
+	return slack.New(apiKey)
+}
+
+func sendSlackMessage(client *slack.Client, msg string, channel string) {
 
 	params := slack.PostMessageParameters{}
 
-	_, _, err := api.PostMessage(channel, msg, params)
+	_, _, err := client.PostMessage(channel, msg, params)
 
 	if err != nil {
 		log.Error("Failed to post message to channel")
 		panic(err)
+	} else {
+		log.Debug(msg)
 	}
 
 	log.Info("Sent message to slack")
-
 }
