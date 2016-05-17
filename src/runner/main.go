@@ -8,6 +8,7 @@ import (
 	"os/exec"
 	"os/signal"
 	"syscall"
+	"github.com/robfig/cron"
 )
 
 var log = logrus.New()
@@ -34,7 +35,9 @@ func main() {
 
 	slackClient := getSlackClient()
 
-	go func() {
+	cron := cron.New()
+
+	cron.AddFunc("5 * * * * *", func() {
 		sendSlackMessage(slackClient, "Start of "+*bin+" program runner", *channel)
 		log.Info("About to execute program runner command...")
 
@@ -56,7 +59,9 @@ func main() {
 		}
 
 		done <- true
-	}()
+	})
+
+	cron.Start()
 
 	go func() {
 		for sig := range osSig {
