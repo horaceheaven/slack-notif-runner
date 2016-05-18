@@ -28,18 +28,18 @@ func main() {
 		os.Exit(-1)
 	}
 
-	osSig := make(chan os.Signal, 1)
+	sig := make(chan os.Signal, 1)
 	done := make(chan bool, 1)
 
-	signal.Notify(osSig, syscall.SIGINT, syscall.SIGTERM)
+	signal.Notify(sig, syscall.SIGINT, syscall.SIGTERM)
 
 	slackClient := getSlackClient()
 
 	cron := cron.New()
 
-	cron.AddFunc("5 * * * * *", func() {
+	cron.AddFunc("0 30 10 1/1 * ? *", func() {
 		sendSlackMessage(slackClient, "Start of "+*bin+" program runner", *channel)
-		log.Info("About to execute program runner command...")
+		log.Info("about to execute program runner command...")
 
 		cmd := exec.Command(*bin, *scriptPath, *scriptArgs)
 
@@ -48,23 +48,21 @@ func main() {
 
 		runErr := cmd.Run()
 
-		log.Info("Finish executing command")
+		log.Info("finish executing command")
 
 		if runErr != nil {
-			log.Info("Failed to finish program execution ", runErr)
-			sendSlackMessage(slackClient, "Failed to run program, log on to system to review the problem", *channel)
+			log.Info("failed to finish program execution ", runErr)
+			sendSlackMessage(slackClient, "failed to run program, log on to system to review the problem", *channel)
 		} else {
-			log.Info("Successfully executed program")
+			log.Info("successfully executed program")
 			sendSlackMessage(slackClient, "Successfully ran program", *channel)
 		}
-
-		done <- true
 	})
 
 	cron.Start()
 
 	go func() {
-		for sig := range osSig {
+		for sig :=  range sig {
 			log.Info(sig)
 			sendSlackMessage(slackClient, "Runner stopped by the following signal: "+sig.String(), *channel)
 		}
@@ -72,14 +70,14 @@ func main() {
 		done <- true
 	}()
 
-	<-done
+	<- done
 }
 
 func getSlackClient() *slack.Client {
 	apiKey, exist := os.LookupEnv("SLACK_API_KEY")
 
 	if !exist {
-		log.Error("Please set the SLACK_API_KEY")
+		log.Error("please set the SLACK_API_KEY")
 	}
 
 	return slack.New(apiKey)
@@ -92,11 +90,11 @@ func sendSlackMessage(client *slack.Client, msg string, channel string) {
 	_, _, err := client.PostMessage(channel, msg, params)
 
 	if err != nil {
-		log.Error("Failed to post message to channel")
+		log.Error("failed to post message to channel")
 		panic(err)
 	} else {
 		log.Debug(msg)
 	}
 
-	log.Info("Sent message to slack")
+	log.Info("sent message to slack")
 }

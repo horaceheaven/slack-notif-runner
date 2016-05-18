@@ -27,3 +27,4 @@ node_modules/
 bin
 .idea
 results
+.DS_Store
